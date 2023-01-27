@@ -1,0 +1,567 @@
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eventing-rabbitmq-broker-controller
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+subjects:
+  - kind: ServiceAccount
+    name: hello-world
+    namespace: knative-eventing
+roleRef:
+  kind: ClusterRole
+  name: knative-eventing-rabbitmq-broker-controller
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: knative-eventing-rabbitmq-broker-controller
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+rules:
+  # Configs resources and status we care about.
+  - apiGroups:
+      - ""
+    resources:
+      - "namespaces/finalizers"
+    verbs:
+      - "update"
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - "get"
+      - "list"
+      - "create"
+      - "update"
+      - "delete"
+      - "patch"
+      - "watch"
+  - apiGroups:
+      - rabbitmq.com
+    resources:
+      - rabbitmqclusters
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+  - apiGroups:
+      - rabbitmq.com
+    resources:
+      - bindings
+      - exchanges
+      - queues
+      - policies
+    verbs:
+      - "get"
+      - "list"
+      - "create"
+      - "update"
+      - "delete"
+      - "patch"
+      - "watch"
+  - apiGroups:
+      - eventing.knative.dev
+    resources:
+      - rabbitmqbrokerconfigs
+    verbs:
+      - "get"
+      - "list"
+      - "create"
+      - "update"
+      - "delete"
+      - "patch"
+      - "watch"
+
+---
+# Copyright 2021 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rabbitmq-broker-webhook
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+rules:
+  # For watching logging configuration and getting certs.
+  - apiGroups:
+      - ""
+    resources:
+      - "configmaps"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+  # For manipulating certs into secrets.
+  - apiGroups:
+      - ""
+    resources:
+      - "secrets"
+      - "namespaces"
+    verbs:
+      - "get"
+      - "create"
+      - "update"
+      - "list"
+      - "watch"
+      - "patch"
+  - apiGroups:
+      - ""
+    resources:
+      - "namespaces/finalizers"
+    verbs:
+      - "update"
+  # For getting our Deployment so we can decorate with ownerref.
+  - apiGroups:
+      - "apps"
+    resources:
+      - "deployments"
+    verbs:
+      - "get"
+  - apiGroups:
+      - "apps"
+    resources:
+      - "deployments/finalizers"
+    verbs:
+      - update
+  # For actually registering our webhook.
+  - apiGroups:
+      - "admissionregistration.k8s.io"
+    resources:
+      - "mutatingwebhookconfigurations"
+      - "validatingwebhookconfigurations"
+    verbs: &everything
+      - "get"
+      - "list"
+      - "create"
+      - "update"
+      - "delete"
+      - "patch"
+      - "watch"
+  # For leader election
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - "leases"
+    verbs: *everything
+    # For validating only our triggers need to lookup the broker
+  - apiGroups:
+      - "eventing.knative.dev"
+    resources:
+      - "brokers"
+    verbs:
+      - "get"
+      - "list"
+      - "watch"
+
+---
+# Copyright 2021 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rabbitmq-broker-webhook
+  namespace: knative-eventing
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rabbitmq-broker-webhook
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+subjects:
+  - kind: ServiceAccount
+    name: rabbitmq-broker-webhook
+    namespace: knative-eventing
+roleRef:
+  kind: ClusterRole
+  name: rabbitmq-broker-webhook
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.8.0
+  creationTimestamp: null
+  name: rabbitmqbrokerconfigs.eventing.knative.dev
+spec:
+  group: eventing.knative.dev
+  names:
+    categories:
+      - all
+      - knative
+      - eventing
+    kind: RabbitmqBrokerConfig
+    listKind: RabbitmqBrokerConfigList
+    plural: rabbitmqbrokerconfigs
+    shortNames:
+      - rmqbrokerconfig
+    singular: rabbitmqbrokerconfig
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: RabbitmqBrokerConfig is the Schema for the RabbitmqBrokerConfig API.
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              properties:
+                queueType:
+                  default: quorum
+                  enum:
+                    - quorum
+                    - classic
+                  type: string
+                rabbitmqClusterReference:
+                  description: RabbitmqClusterReference stores a reference to RabbitmqCluster. This will get used to create resources on the RabbitMQ Broker.
+                  properties:
+                    connectionSecret:
+                      description: Secret contains the http management uri for the RabbitMQ cluster. The Secret must contain the key `uri`, `username` and `password`. It may optionally contain port or will be defaulted to 5672. Have to set either name or connectionSecret, but not both.
+                      properties:
+                        name:
+                          description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names TODO: Add other useful fields. apiVersion, kind, uid?'
+                          type: string
+                      type: object
+                    name:
+                      description: The name of the RabbitMQ cluster to reference. Have to set either name or connectionSecret, but not both.
+                      type: string
+                    namespace:
+                      description: The namespace of the RabbitMQ cluster to reference. Defaults to the namespace of the requested resource if omitted.
+                      type: string
+                  type: object
+              type: object
+          type: object
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+
+---
+# Copyright 2020 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-broker-controller
+  namespace: knative-eventing
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq-broker-controller
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-broker-controller
+        eventing.knative.dev/release: devel
+    spec:
+      serviceAccountName: eventing-controller
+      containers:
+        - name: rabbitmq-broker-controller
+          terminationMessagePolicy: FallbackToLogsOnError
+          image: gcr.io/knative-releases/knative.dev/eventing-rabbitmq/cmd/controller/broker@sha256:a990033b4b0974e22b5440ed0cc46b0813762120d59e77b5fb7a00b068020aaf
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          env:
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: CONFIG_OBSERVABILITY_NAME
+              value: config-observability
+            - name: METRICS_DOMAIN
+              value: knative.dev/eventing
+            # Broker
+            - name: BROKER_INGRESS_IMAGE
+              value: gcr.io/knative-releases/knative.dev/eventing-rabbitmq/cmd/ingress@sha256:7e510f999b98b83a0df16645989f58efd24e8445b798b77144a4d792479496f3
+            - name: BROKER_INGRESS_SERVICE_ACCOUNT
+              value: eventing-broker-ingress
+            - name: BROKER_DISPATCHER_IMAGE
+              value: gcr.io/knative-releases/knative.dev/eventing-rabbitmq/cmd/dispatcher@sha256:7cd0225d481ad0dff8c64344c764674d2316e31d636ea7a891c13c53cd9094b0
+            - name: BROKER_DLQ_DISPATCHER_IMAGE
+              value: gcr.io/knative-releases/knative.dev/eventing-rabbitmq/cmd/dispatcher@sha256:7cd0225d481ad0dff8c64344c764674d2316e31d636ea7a891c13c53cd9094b0
+            - name: BROKER_DISPATCHER_SERVICE_ACCOUNT
+              value: eventing-broker-filter
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: BROKER_IMAGE_PULL_SECRET_NAME
+              value:
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          ports:
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+
+---
+# Copyright 2021 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validation.webhook.rabbitmq.eventing.knative.dev
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+webhooks:
+  - admissionReviewVersions: ["v1"]
+    clientConfig:
+      service:
+        name: rabbitmq-broker-webhook
+        namespace: knative-eventing
+    sideEffects: None
+    failurePolicy: Fail
+    name: validation.webhook.rabbitmq.eventing.knative.dev
+    timeoutSeconds: 2
+
+---
+# Copyright 2021 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-broker-webhook-certs
+  namespace: knative-eventing
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+# The data is populated at install time.
+
+---
+# Copyright 2021 The Knative Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq-broker-webhook
+  namespace: knative-eventing
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: rabbitmq-broker-webhook
+      role: rabbitmq-broker-webhook
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      # To avoid node becoming SPOF, spread our replicas to different nodes.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: rabbitmq-broker-webhook
+                topologyKey: kubernetes.io/hostname
+              weight: 100
+      serviceAccountName: rabbitmq-broker-webhook
+      enableServiceLinks: false
+      containers:
+        - name: rabbitmq-broker-webhook
+          terminationMessagePolicy: FallbackToLogsOnError
+          # This is the Go import path for the binary that is containerized
+          # and substituted here.
+          image: gcr.io/knative-releases/knative.dev/eventing-rabbitmq/cmd/webhook/broker@sha256:0d80a0cf4159a371d1f5e0841e96018973c2c2db727824a991a3ebd92357333c
+          resources:
+            requests:
+              # taken from serving.
+              cpu: 20m
+              memory: 20Mi
+            limits:
+              # taken from serving.
+              cpu: 200m
+              memory: 200Mi
+          env:
+            - name: SYSTEM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_LOGGING_NAME
+              value: config-logging
+            - name: METRICS_DOMAIN
+              value: knative.dev/sources
+            - name: WEBHOOK_NAME
+              value: rabbitmq-broker-webhook
+            - name: WEBHOOK_PORT
+              value: "8443"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          ports:
+            - name: https-webhook
+              containerPort: 8443
+            - name: metrics
+              containerPort: 9090
+            - name: profiling
+              containerPort: 8008
+          readinessProbe: &probe
+            periodSeconds: 1
+            httpGet:
+              scheme: HTTPS
+              port: 8443
+              httpHeaders:
+                - name: k-kubelet-probe
+                  value: "webhook"
+          livenessProbe:
+            !!merge <<: *probe
+            initialDelaySeconds: 20
+      # Our webhook should gracefully terminate by lame ducking first, set this to a sufficiently
+      # high value that we respect whatever value it has configured for the lame duck grace period.
+      terminationGracePeriodSeconds: 300
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    rabbitmq.eventing.knative.dev/release: "v1.8.3"
+    role: rabbitmq-broker-webhook
+  name: rabbitmq-broker-webhook
+  namespace: knative-eventing
+spec:
+  ports:
+    - name: https-webhook
+      port: 443
+      targetPort: 8443
+  selector:
+    role: rabbitmq-broker-webhook
+
+---
