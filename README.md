@@ -4,7 +4,7 @@ This repo intends to have a minimal set of steps to run in order to create a
 working example service that revieves and processes events from knative using
 a broker that's provided by rabbitmq.
 
-It uses parts of both the [knative documentation](git@github.com:knative/docs.git)
+It uses parts of both the [knative documentation](https://github.com/knative/docs/)
 and the [rabbitmq documentation](https://github.com/rabbitmq/cluster-operator).
 
 A set of steps is layed out that combines the examples to effect a service
